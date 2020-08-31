@@ -7,6 +7,7 @@ import NewSeatMap from "./components/NewSeatMap"
 import NewEvent from "./components/NewEvent"
 import RSVPeventScreen from "./components/RSVPeventScreen"
 import ListEvents from "./components/ListEvents"
+import DashboardScreen from "./components/DashboardScreen"
 
 const routes = {
   "/": () => (<Home />),
@@ -16,5 +17,6 @@ const routes = {
   "/events": () => (<ListEvents />),
   "/event/rsvp/:key": ({key}) => (<RSVPeventScreen eventKey={key}/>),
   "/event/new": () => (<NewEvent />),
+  "/dashboard": () => (<DashboardScreen />),
 };
 export default routes;

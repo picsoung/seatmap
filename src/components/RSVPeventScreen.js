@@ -6,26 +6,25 @@ import {
   Image,
   Button,
   Heading,
-  Form,
-  FormField,
-  Markdown,
+  Meter,
+  Stack
 } from "grommet";
 
 import mondaySdk from "monday-sdk-js";
 import { navigate, A } from "hookrouter";
 
 import Spinner from "./Spinner";
-import ImageLabel from "./ImageLabel";
 
 import { SeatsioClient } from "seatsio";
 import { SeatsioSeatingChart } from "@seatsio/seatsio-react";
+
+import { Home } from "grommet-icons";
 
 const monday = mondaySdk();
 const RSVPeventScreen = ({ eventKey }) => {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [seatsioClient, setSeatsioClient] = useState(null);
-  const [currentChart, setCurrentChart] = useState({});
   const [currentEvent, setCurrentEvent] = useState({});
   const [eventName, setEventName] = useState("");
   const [teams, setTeams] = useState([]);
@@ -35,6 +34,7 @@ const RSVPeventScreen = ({ eventKey }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [existingOrder, setExistingOrder] = useState(null)
   const [context, setContext] = useState(null)
+  const [eventSummary, setEventSummary] = useState(null)
 
   useEffect(() => {
     monday.listen("settings", async (res) => {
@@ -76,6 +76,33 @@ const RSVPeventScreen = ({ eventKey }) => {
       })
     }
   }, [seatsioClient, currentUser])
+
+  useEffect(()=>{
+    if(seatsioClient && currentUser){
+      let summary = seatsioClient.eventReports.summaryByStatus(eventKey).then((sum)=>{
+        console.log(sum)
+        let r = {}
+        if(!sum.booked){
+          r = {
+            value: 100,
+            label: 'free'
+          }
+        }else if(!sum.free){
+          r = {
+            value: 100,
+            label: 'booked'
+          }
+        }else{
+          r = {
+            value: (sum.booked.count/(sum.booked.count+sum.free.count))*100,
+            label: 'booked'
+          }
+        }
+        setEventSummary(r)
+        return sum
+      });
+  }
+}, [seatsioClient, currentUser, existingOrder])
 
   const bookSeat = async () => {
     let orderId = `${currentUser.name}`
@@ -171,7 +198,6 @@ const RSVPeventScreen = ({ eventKey }) => {
   }
 
   const removeFromBoard = ()=> {
-     //check for groups
      monday
      .api(`query {
         items_by_column_values (board_id: ${context.boardId}, column_id: "name", column_value: "${currentUser.name}") {
@@ -185,10 +211,8 @@ const RSVPeventScreen = ({ eventKey }) => {
       }`
       )
      .then(async (res) => {
-       console.log("items", res.data.items_by_column_values[0], context.boardId, currentEvent.key);
-       console.log(res.data.items_by_column_values)
        let itemsInGroup = res.data.items_by_column_values.map((i)=>{
-        if(i.group.title === currentEvent.key){
+        if(i.group.title === currentEvent.key){ //only items of the same group
           return i.id
         }
        })
@@ -198,14 +222,14 @@ const RSVPeventScreen = ({ eventKey }) => {
                id
                }
            }`).then((result)=>{
-             console.log('result', result)
+             console.log('result delete_item', result)
            }).catch((err)=>{
-             console.log('errr', err)
+             console.log('err delete_item', err)
            })
        })
      })
      .catch((err) => {
-       console.log("aahah", err);
+       console.log("err query", err);
      });
   }
 
@@ -216,15 +240,26 @@ const RSVPeventScreen = ({ eventKey }) => {
   return (
     <Box fill={true}>
       <Grid
-        rows={["xsmall", "full"]}
+        rows={["xxsmall", "xsmall", "full"]}
         columns={["3/4", "1/4"]}
         areas={[
-          { name: "header", start: [0, 0], end: [1, 0] },
-          { name: "main", start: [0, 1], end: [0, 1] },
-          { name: "sidebar", start: [1, 1], end: [1, 1] },
+          { name: "nav", start: [0, 0], end: [1, 0] },
+          { name: "header", start: [0, 1], end: [1, 1] },
+          { name: "main", start: [0, 2], end: [0, 2] },
+          { name: "sidebar", start: [1, 2], end: [1, 2] }
         ]}
         fill={true}
       >
+        <Box
+          gridArea="nav"
+          direction="row"
+          align="center"
+          background="light-2"
+          pad="medium"
+        >
+          <A href="/"><Home/></A>
+          <A href="/events">Events</A>
+        </Box>
         <Box gridArea="header" background="brand" justify="center">
           {loading && <Spinner />}
           <Heading color="white" margin="medium">
@@ -252,7 +287,28 @@ const RSVPeventScreen = ({ eventKey }) => {
           )}
         </Box>
         <Box gridArea="sidebar" background="light-4" fill={true}>
-          {selectedObject && (
+          {eventSummary &&(
+            <Box pad="medium">
+              <Heading size="small">Event summary</Heading>
+              <Stack anchor="center">
+                <Meter
+                  type="circle"
+                  background="light-2"
+                  values={[{ value:  eventSummary.value}]}
+                  size="xsmall"
+                  thickness="small"
+                />
+                <Box direction="row" align="center" pad={{ bottom: 'xsmall' }}>
+                  <Text size="xlarge" weight="bold">
+                    {Math.floor(eventSummary.value)}
+                  </Text>
+                  <Text size="small">% {eventSummary.label}</Text>
+                </Box>
+              </Stack>
+              {/* <Meter type="circle" background="light-2" values={[{ value: eventSummary.booked.count }]} /> */}
+            </Box>
+          )}
+          {selectedObject && !existingOrder && (
             <Box margin="medium">
               <Heading size="small">Book your seat</Heading>
               <Box>
@@ -276,7 +332,7 @@ const RSVPeventScreen = ({ eventKey }) => {
               <Heading size="small">Your spot</Heading>
               <Box>
                   <Heading level="3" margin="none">Details</Heading>
-                  <Text color="dark-4" size="medium"><strong>Category:</strong> {existingOrder.categoryLabel}</Text>
+                  <Text color="dark-4" size="medium"><strong>Type:</strong> {existingOrder.categoryLabel}</Text>
                   <Text color="dark-4" size="medium"><strong>{capitalize(existingOrder.labels.parent.type)}:</strong> {existingOrder.labels.parent.label}</Text>
                   <Text color="dark-4" size="medium"><strong>{capitalize(existingOrder.labels.own.type)}:</strong> {existingOrder.labels.own.label}</Text>
                   <Text color="dark-4" size="medium"><strong>Status:</strong> {existingOrder.status}</Text>

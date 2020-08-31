@@ -11,9 +11,9 @@ import {
   TextInput,
   Select,
   CheckBox,
-  Image,
+  Grid,
 } from "grommet";
-import { Cluster, Calendar } from "grommet-icons";
+import { Home } from "grommet-icons";
 
 import mondaySdk from "monday-sdk-js";
 import { navigate, A } from "hookrouter";
@@ -50,7 +50,7 @@ const NewEvent = () => {
         setSeatsioClient(client);
         let chrts = await client.charts.listFirstPage();
         console.log(chrts);
-        setCharts(chrts.items.filter((c)=> c.status==="PUBLISHED"));
+        setCharts(chrts.items.filter((c) => c.status === "PUBLISHED"));
         setLoading(false);
       }
     });
@@ -89,78 +89,111 @@ const NewEvent = () => {
     });
   }, []);
 
-  const createNewEvent = async ({eventName, boardId, socialDistance, team, seatMap}) => {
+  const createNewEvent = async ({
+    eventName,
+    boardId,
+    socialDistance,
+    team,
+    seatMap,
+  }) => {
     //createevent on Seats.io
-    let socialDistanceRuleSet = null
-    if(socialDistance){
-      socialDistanceRuleSet= Object.keys(seatMap.socialDistancingRulesets)[0]
+    let socialDistanceRuleSet = null;
+    if (socialDistance) {
+      socialDistanceRuleSet = Object.keys(seatMap.socialDistancingRulesets)[0];
     }
-    let event = await seatsioClient.events.create(seatMap.key, slugify(eventName, {replacement: "-"}), false, socialDistanceRuleSet);
-    console.log(event)
-    navigate(`/event/rsvp/${event.key}`)
+    let event = await seatsioClient.events.create(
+      seatMap.key,
+      slugify(eventName, { replacement: "-" }),
+      false,
+      socialDistanceRuleSet
+    );
+    console.log(event);
+    navigate(`/event/rsvp/${event.key}`);
     //create group on Monday board
-  }
+  };
 
   return (
     <Box fill={true}>
-      <Box gridArea="header" background="brand" pad="medium">
-        {loading && <Spinner />}
-        <Heading color="white" margin={{ bottom: "xsmall" }}>
-          Create a new event
-        </Heading>
-      </Box>
-      <Box gridArea="main" background="light-2" fill={true} id="booxxxx">
-        <Form onSubmit={({ value }) => {
-          console.log("Submit: ", value)
-          createNewEvent({
-            eventName: value.eventname,
-            seatMap: value.seatmap,
-            team: value.team,
-            socialDistance: value.socialdistancing
-          })
-          }}>
-          <FormField
-            name="eventname"
-            label="Event name"
-            required={true}
-            placeholder="Week #36 starting Monday 7th Sept"
-          />
-          <FormField
-            label="Pick a seat map"
-            name="seatmap"
-            component={Select}
-            options={charts}
-            labelKey="name"
-            valueKey="key"
-          />
-          <FormField
-            name="socialdistancing"
-            component={CheckBox}
-            pad={true}
-            label="Social distancing enforced?"
-          />
-          <FormField label="Pick a team" width="medium">
-            <Select
-              name="team"
-              // component={Select}
-              options={teams}
+      <Grid
+        rows={["xxsmall", "xsmall", "full"]}
+        columns={["3/4", "1/4"]}
+        areas={[
+          { name: "nav", start: [0, 0], end: [1, 0] },
+          { name: "header", start: [0, 1], end: [1, 1] },
+          { name: "main", start: [0, 2], end: [1, 2] },
+        ]}
+        fill={true}
+      >
+        <Box
+          gridArea="nav"
+          direction="row"
+          align="center"
+          background="light-2"
+          pad="medium"
+        >
+          <A href="/"><Home/></A>
+        </Box>
+        <Box gridArea="header" background="brand" pad="medium">
+          {loading && <Spinner />}
+          <Heading color="white" margin="none">
+            Create a new event
+          </Heading>
+        </Box>
+        <Box gridArea="main" background="light-2" fill={true} pad="medium" id="booxxxx" align="center">
+          <Form
+            onSubmit={({ value }) => {
+              console.log("Submit: ", value);
+              createNewEvent({
+                eventName: value.eventname,
+                seatMap: value.seatmap,
+                team: value.team,
+                socialDistance: value.socialdistancing,
+              });
+            }}
+          >
+            <FormField
+              name="eventname"
+              label="Event name"
+              required={true}
+              placeholder="Week #36 starting Monday 7th Sept"
+            />
+            <FormField
+              label="Pick a seat map"
+              name="seatmap"
+              component={Select}
+              options={charts}
               labelKey="name"
-              valueKey="id"
-              value={selectedTeam}
-              onChange={({ value: nextValue }) => {
-                let t = teams.find((t) => t.id === nextValue.id);
-                setSelectedTeam(nextValue);
-              }}
-            >
-              {(option, index, options, { active, disabled, selected }) => (
-                <ImageLabel src={option.picture_url} label={option.name} />
-              )}
-            </Select>
-          </FormField>
+              valueKey="key"
+            />
+            <FormField
+              name="socialdistancing"
+              component={CheckBox}
+              pad={true}
+              label="Social distancing enforced?"
+            />
+            <FormField label="Pick a team" width="medium">
+              <Select
+                name="team"
+                // component={Select}
+                options={teams}
+                labelKey="name"
+                valueKey="id"
+                value={selectedTeam}
+                onChange={({ value: nextValue }) => {
+                  let t = teams.find((t) => t.id === nextValue.id);
+                  setSelectedTeam(nextValue);
+                }}
+              >
+                {(option, index, options, { active, disabled, selected }) => (
+                  <ImageLabel src={option.picture_url} label={option.name} />
+                )}
+              </Select>
+            </FormField>
 
-          <Button type="submit" label="Create a new event" primary={true} />
-        </Form>
-      </Box>
+            <Button type="submit" label="Create a new event" primary={true} />
+          </Form>
+        </Box>
+      </Grid>
     </Box>
   );
 };
