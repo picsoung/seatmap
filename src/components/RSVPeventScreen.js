@@ -44,6 +44,7 @@ const RSVPeventScreen = ({ eventKey }) => {
         let client = new SeatsioClient(res.data.seatsio_secret_key);
         setSeatsioClient(client);
         let event = await client.events.retrieve(eventKey);
+        event.title = event.key.replace('-',' ')
         setCurrentEvent(event);
         setLoading(false);
       }
@@ -103,11 +104,24 @@ const RSVPeventScreen = ({ eventKey }) => {
         message: "Your spot has been released 🙏.",
         type: "success", // or "error" (red), or "info" (blue)
         timeout: 10000,
-     });
+      });
+      removeFromBoard()
     }
   }
 
-  const addToBoard = async (obj) => {
+  const createGroup = async (boardId, groupName) => {
+    return monday.api(`mutation {
+      create_group (board_id: ${boardId}, group_name: "${groupName}") {
+        id
+      }
+    }`).then((result)=>{
+      console.log('result', result)
+      return result.data.create_group
+    }).catch((err)=>{
+      console.log('errr', err)
+    })
+  }
+  const addToBoard = async (orderObject) => {
     //check for groups
     monday
         .api(`query ($boardId: [Int]) {
@@ -121,27 +135,78 @@ const RSVPeventScreen = ({ eventKey }) => {
          }`,
          { variables: { boardId: context.boardId } }
          )
-        .then((res) => {
-          console.log("groooups", res.data.boards[0].groups, context.boardId);
+        .then(async (res) => {
+          console.log("groooups", res.data.boards[0].groups, context.boardId, currentEvent.key);
           let groups = res.data.boards[0].groups
           let existingGroup = groups.find((g)=>g.title === currentEvent.key)
           if(!existingGroup){
-            //create group
-            monday.setToken('eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjcxMjMxMjA5LCJ1aWQiOjU2MTMzOTMsImlhZCI6IjIwMjAtMDgtMjFUMDE6MDg6NTEuMDAwWiIsInBlciI6Im1lOndyaXRlIn0.4rKYyGyAssnpX2r4GdfWa4DTU_NoCFvxzIs-UA2vY6w')
-            monday.api(`mutation {
-                create_group (board_id: $boardId, group_name: "new group") {
-                  id
-                }
-              }`,{ variables: { boardId: context.boardId } }).then((result)=>{
-                console.log('result', result)
-              })
+            existingGroup = await createGroup(context.boardId, currentEvent.key)
           }
-          // setCurrentUser(res.data.me)
-          // setLoading(false);
+          let column_values = {
+            'table__7': orderObject.labels.parent.label,
+            'numbers': orderObject.labels.own.label,
+            'date4': {
+              'date': new Date().toLocaleDateString('fr-CA')
+            },
+            "person": {
+              "personsAndTeams":[{
+                "id": currentUser.id,
+                "kind": "person"
+              }]
+            }
+          }
+          monday.api(`mutation {
+            create_item (board_id: ${context.boardId}, group_id: "${existingGroup.id}", item_name: "${currentUser.name}", column_values: ${JSON.stringify(JSON.stringify(column_values))}) {
+              id
+              }
+          }`).then((result)=>{
+            console.log('result', result)
+          }).catch((err)=>{
+            console.log('errr', err)
+          })
         })
         .catch((err) => {
           console.log("aahah", err);
         });
+  }
+
+  const removeFromBoard = ()=> {
+     //check for groups
+     monday
+     .api(`query {
+        items_by_column_values (board_id: ${context.boardId}, column_id: "name", column_value: "${currentUser.name}") {
+          id
+          name,
+            group {
+              id,
+              title
+            }
+          }
+      }`
+      )
+     .then(async (res) => {
+       console.log("items", res.data.items_by_column_values[0], context.boardId, currentEvent.key);
+       console.log(res.data.items_by_column_values)
+       let itemsInGroup = res.data.items_by_column_values.map((i)=>{
+        if(i.group.title === currentEvent.key){
+          return i.id
+        }
+       })
+       itemsInGroup.map((item)=>{
+        monday.api(`mutation {
+             delete_item (item_id: ${item}) {
+               id
+               }
+           }`).then((result)=>{
+             console.log('result', result)
+           }).catch((err)=>{
+             console.log('errr', err)
+           })
+       })
+     })
+     .catch((err) => {
+       console.log("aahah", err);
+     });
   }
 
   const capitalize = (text) => {

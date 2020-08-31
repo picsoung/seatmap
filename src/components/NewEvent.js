@@ -95,7 +95,7 @@ const NewEvent = () => {
     if(socialDistance){
       socialDistanceRuleSet= Object.keys(seatMap.socialDistancingRulesets)[0]
     }
-    let event = await seatsioClient.events.create(seatMap.key, slugify(eventName, {remove: /[^\w-]+/g,replacement: "-",lower: true}), false, socialDistanceRuleSet);
+    let event = await seatsioClient.events.create(seatMap.key, slugify(eventName, {replacement: "-"}), false, socialDistanceRuleSet);
     console.log(event)
     navigate(`/event/rsvp/${event.key}`)
     //create group on Monday board
